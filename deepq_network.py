@@ -38,7 +38,7 @@ class DQN():
         return loss
 
 
-    def predict_action(self, explore_start, explore_stop, decay_rate, decay_step, state):
+    def predict_action(self, explore_start, explore_stop, decay_rate, decay_step, state, is_pretrain=False, is_eval=False):
         # exploration - exploitation tradeoff
         # breakpoint()
         exp_exp_tradeoff = np.random.rand()
@@ -47,7 +47,7 @@ class DQN():
         # Here we'll use an improved version of our epsilon greedy strategy used in Q-learning notebook
         explore_probability = explore_stop + (explore_start - explore_stop) * np.exp(-decay_rate * decay_step)
 
-        if explore_probability > exp_exp_tradeoff:
+        if not is_eval and (is_pretrain or explore_probability > exp_exp_tradeoff):
             # Choose a random action (exploration)
             action = random.choice(possible_actions)
             # print("RANDOM", action)
