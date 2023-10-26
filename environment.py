@@ -9,15 +9,15 @@ import pandas
 import deepq_network
 import memory
 class Environment:
-    def __init__(self, reward_pos):
+    def __init__(self, size, reward_pos):
         self.wins = 0
         self.losses = 0
         self.points_lost = -100
         self.points_reward = 1000
-        self.size = np.array([5,5])
+        self.size = np.array(size)
         self.reward_pos = np.array(reward_pos)
         self.board = self.get_new_board()
-        self.pos = np.array([1, 1])
+        self.pos = np.array([5, 1])
         self.printing = False
 
     def reset(self):
@@ -81,11 +81,15 @@ class Environment:
     def is_finished(self):
         finished = (self.get_current_value() != 0)
         if finished:
-            self.printing = False
             if self.get_current_value() == self.points_lost:
                 self.losses += 1
+                if self.printing:
+                    print("YOU LOSE! :(")
             else:
                 self.wins += 1
+                if self.printing:
+                    print("YOU WIN! :)")
+            self.printing = False
         return finished
 
     def get_ratio(self):
