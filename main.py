@@ -149,7 +149,6 @@ if __name__ == '__main__':
     memory = memory.Memory(max_size=memory_size)
 
     size = [15,15]
-
     # pretrain(board, batch_size, memory)
     # board = Environment(size, reward_position)
 
@@ -272,4 +271,3 @@ if __name__ == '__main__':
             if epoch % 50 == 0:
                 DeepQNetwork.model.save_weights('saved_DQN.ckpt')
                 print("--------------------Network saved--------------------")
-
