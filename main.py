@@ -3,6 +3,7 @@ import sys
 from environment import *
 import argparse
 import deepq_network as dqn
+import pygame
 
 tf.get_logger().setLevel('INFO')
 
@@ -22,11 +23,18 @@ def update_target_graph(DQNetwork, TargetNetwork):
         op_holder.append(to_var.assign(from_var))
     return op_holder
 
+# Function to set player position
+def set_player_position(row, col):
+    global player_x, player_y
+    player_x, player_y = col * cell_size, row * cell_size
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Arguments for evaluation or training mode.")
     parser.add_argument("--eval", action="store_true", help="Enable just evaluation mode. Provide a checkpoint path.")
     parser.add_argument("--continue_training", action="store_true", help="Enable training but with checkpoint.")
     parser.add_argument("--checkpoint", type=str, help="Path to the checkpoint file.")
+    parser.add_argument("--init", type=str, help="Initial position. Example: 12,3", default="1,1")
+    parser.add_argument("--reward", type=str, help="Reward position. Example: 5,4", default="12,12")
 
     args = parser.parse_args()
     checkpoint = args.checkpoint
@@ -36,13 +44,84 @@ if __name__ == '__main__':
         print("Error, checkpoint not provided.")
         exit()
 
+    pos_args = args.init.split(',')
+    reward_args = args.reward.split(',')
+    pos_args = [int(pos_args[0]), int(pos_args[1])]
+    reward_args = [int(reward_args[0]), int(reward_args[1])]
+
+
+
+
+    # Initialize Pygame
+    pygame.init()
+
+    # Set up display
+    cell_size = 50
+    grid_size = 10
+    width, height = cell_size * grid_size, cell_size * grid_size
+    screen = pygame.display.set_mode((width, height))
+    pygame.display.set_caption("Player Movement in Grid")
+
+    # Set up player
+    player_size = cell_size
+    player_x, player_y = 0, 0
+    player_speed = cell_size
+
+    # Set up colors
+    red = (255, 0, 0)
+    grid_color = (0, 0, 0)
+
+    # Main game loop
+    clock = pygame.time.Clock()
+
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+
+        # Get the state of all keys
+        keys = pygame.key.get_pressed()
+
+        # Update player position based on keys
+        if keys[pygame.K_LEFT] and player_x > 0:
+            player_x -= player_speed
+        if keys[pygame.K_RIGHT] and player_x < width - player_size:
+            player_x += player_speed
+        if keys[pygame.K_UP] and player_y > 0:
+            # player_y -= player_speed
+            set_player_position(1, 1)
+        if keys[pygame.K_DOWN] and player_y < height - player_size:
+            player_y += player_speed
+
+        # Draw grid
+        for row in range(grid_size):
+            for col in range(grid_size):
+                pygame.draw.rect(screen, grid_color, (col * cell_size, row * cell_size, cell_size, cell_size), 1)
+
+        # Draw background
+        screen.fill((255, 255, 255))
+
+        # Draw player
+        pygame.draw.rect(screen, red, (player_x, player_y, player_size, player_size))
+
+        # Update display
+        pygame.display.flip()
+
+        # Cap the frame rate
+        clock.tick(10)  # Adjust the frame rate as needed
+
+
+
+
+    exit()
 
 
     # 1 up, 2 down, 3 left, 4 right
     possible_actions = np.array([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]])
 
     # MODEL HYPERPARAMETERS
-    state_size = 2  # [coordinateX, coordinateY]
+    state_size = 4  # [coordinateX, coordinateY, rewardX, rewardY]
     lr = 0.001  # Alpha (the learning rate)
 
     # TRAINING HYPERPARAMETERS
@@ -70,9 +149,7 @@ if __name__ == '__main__':
     memory = memory.Memory(max_size=memory_size)
 
     size = [15,15]
-    reward_position = [7,7]
 
-    board = Environment(size, reward_position)
     # pretrain(board, batch_size, memory)
     # board = Environment(size, reward_position)
 
@@ -81,18 +158,19 @@ if __name__ == '__main__':
 
 
     if eval:
+        board = Environment(size, pos_args, reward_args, True)
         # Load model
         DeepQNetwork.model.load_weights(checkpoint)
         board.print_next()
-
         # Play one episode
         while not board.is_finished():
             board.draw()
             output, _ = DeepQNetwork.predict_action(explore_start, explore_stop, decay_rate, decay_step,
-                                                               board.get_state(), is_eval=True)
+                                                    board.get_state(), is_eval=True)
             board.move(output)
 
     else:
+        board = Environment(size)
         is_pretrain = True
         if continue_training:
             explore_start = 0.5
@@ -122,10 +200,10 @@ if __name__ == '__main__':
                     # Add experience to memory
                     step = max_steps + 1
                     memory.add([state, output, reward, new_state, True])
-                    board.reset()
-                    state = board.get_state().copy()
-                    print('Moves', moves, 'Episode:', epoch, 'Total reward:', round(episode_reward, 4),
-                          'Won', board.wins, 'Lost', board.losses, "Epsilon:", round(explore_prob, 6))
+                    # board.reset()
+                    # state = board.get_state().copy()
+                    print(f'Started in({board.x_init},{board.y_init}) Reward in ({board.reward_pos[0]},{board.reward_pos[1]}) Moves {moves}, Episode: {epoch} Total reward: {round(episode_reward, 4)} '
+                          f'Won {board.wins} Lost {board.losses} Epsilon: {round(explore_prob, 6)}')
                 else:
                     memory.add((state, output, reward, new_state, False))
                     # Our state is now the next_state
@@ -137,7 +215,6 @@ if __name__ == '__main__':
                         decay_step = 0
                         tau = 0
                         print("Pretrain finalizado")
-                    # breakpoint()
                     continue
 
 
@@ -179,7 +256,6 @@ if __name__ == '__main__':
 
                 loss = DeepQNetwork.calculate_loss(target_Qs, states_mb, actions_mb)
 
-                # breakpoint()
                 if tau > max_tau:
                     # Update the parameters of our TargetNetwork with DQN_weights
                     TargetNetwork.model.set_weights(DeepQNetwork.model.get_weights())
@@ -195,4 +271,5 @@ if __name__ == '__main__':
 
             if epoch % 50 == 0:
                 DeepQNetwork.model.save_weights('saved_DQN.ckpt')
+                print("--------------------Network saved--------------------")
 

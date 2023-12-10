@@ -5,32 +5,41 @@ import matplotlib.pyplot as plt # Display graphs
 import math
 import os
 import pandas
+import time
 
 import deepq_network
 import memory
 class Environment:
-    def __init__(self, size, reward_pos):
+    def __init__(self, size, init_pos, reward_pos, eval=False):
         self.wins = 0
         self.losses = 0
-        self.points_lost = -100
-        self.points_reward = 1000
+        self.points_lost = -1000
+        self.points_reward = 10000
         self.size = np.array(size)
         self.reward_pos = np.array(reward_pos)
-        self.board = self.get_new_board()
-        self.pos = np.array([5, 1])
+        self.board = self.get_new_board(eval)
+        self.x_init, self.y_init = init_pos
+        self.pos = np.array([self.x_init, self.y_init])
         self.printing = False
 
     def reset(self):
         self.board = self.get_new_board()
-        self.pos = np.array([1, 1])
+        while True:
+            self.x_init = np.random.randint(1, self.size[0]-1)
+            self.y_init = np.random.randint(1, self.size[1]-1)
+            self.pos = np.array([self.x_init, self.y_init])
+            if self.board[self.pos[0],self.pos[1]] != self.points_reward:
+                break
 
 
-    def get_new_board(self):
+    def get_new_board(self, eval):
         board = np.zeros((self.size[0] + 1, self.size[1] + 1))
         board[0, :] = self.points_lost
         board[-1, :] = self.points_lost
         board[:, 0] = self.points_lost
         board[:, -1] = self.points_lost
+        if not eval:
+            self.reward_pos = np.array([np.random.randint(1, self.size[0]-1), np.random.randint(1, self.size[1]-1)])
         board[self.reward_pos[0], self.reward_pos[1]] = self.points_reward
         return board
 
@@ -61,15 +70,17 @@ class Environment:
         if self.printing:
             os.system('cls' if os.name == 'nt' else 'clear')
             self.draw()
-        return reward, self.pos.copy()
+            time.sleep(0.3)
+        return reward, self.get_state()
 
     def draw(self):
         x = self.board.copy()
-        x[self.pos[0], self.pos[1]] = 7
+        x[self.pos[0], self.pos[1]] = 55
         print(x)
 
     def get_state(self):
-        return self.pos
+        state = np.concatenate((self.pos, (self.reward_pos - self.pos)))
+        return state
 
     def get_current_value(self):
         return self.board[self.pos[0], self.pos[1]]
